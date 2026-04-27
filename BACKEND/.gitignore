@@ -1,0 +1,47 @@
+# OS/editor
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# environment files
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+*.out
+*.err
+*.pid
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# dependencies
+node_modules/
+.npm/
+
+# generated metadata
+*.tsbuildinfo
+.metro-health-check*
+.cache/
+.tmp/
+tmp/
+
+# backend specific
+uploads/
+dist/
+build/
+coverage/
+
+# signing/keys
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem

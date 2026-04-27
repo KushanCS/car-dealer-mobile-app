@@ -30,16 +30,36 @@ async function saveVehicleImage(buffer) {
   return { url: `/uploads/vehicles/${filename}`, filename };
 }
 
+function getRequestBaseUrl(req) {
+  if (process.env.IMAGE_BASE_URL) {
+    return process.env.IMAGE_BASE_URL;
+  }
+
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const forwardedHost = req.headers["x-forwarded-host"];
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+function toAbsoluteUrl(url, baseUrl) {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 // Helper function to build absolute image URLs
 function buildAbsoluteImageUrls(vehicles, req) {
-  const baseUrl = process.env.IMAGE_BASE_URL || `${req.protocol}://${req.get('host')}`;
-  
-  return vehicles.map(v => {
+  const baseUrl = getRequestBaseUrl(req);
+
+  return vehicles.map((v) => {
     const vehicleObj = v.toObject ? v.toObject() : v;
     if (vehicleObj.images && vehicleObj.images.length > 0) {
-      vehicleObj.images = vehicleObj.images.map(img => ({
+      vehicleObj.images = vehicleObj.images.map((img) => ({
         ...img,
-        url: img.url.startsWith('http') ? img.url : `${baseUrl}${img.url}`
+        url: toAbsoluteUrl(img.url, baseUrl),
       }));
     }
     return vehicleObj;
@@ -173,7 +193,8 @@ router.post(
         },
       });
 
-      res.status(201).json(vehicle);
+      const [vehicleWithUrls] = buildAbsoluteImageUrls([vehicle], req);
+      res.status(201).json(vehicleWithUrls);
     } catch (err) {
       res.status(400).json({ message: err.message || "Failed to add vehicle" });
     }
@@ -288,7 +309,8 @@ router.put(
         });
       }
 
-      res.json(vehicle);
+      const [vehicleWithUrls] = buildAbsoluteImageUrls([vehicle], req);
+      res.json(vehicleWithUrls);
     } catch (err) {
       res.status(400).json({ message: err.message || "Failed to update vehicle" });
     }
@@ -377,7 +399,8 @@ router.delete(
       vehicle.images.splice(imgIndex, 1);
       await vehicle.save();
 
-      res.json({ message: "Image deleted", vehicle });
+      const [vehicleWithUrls] = buildAbsoluteImageUrls([vehicle], req);
+      res.json({ message: "Image deleted", vehicle: vehicleWithUrls });
     } catch (err) {
       res.status(400).json({ message: err.message || "Failed to delete image" });
     }

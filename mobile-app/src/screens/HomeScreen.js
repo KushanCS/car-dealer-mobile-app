@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -18,62 +17,22 @@ import {
 } from "@expo/vector-icons";
 
 import api from "../services/api";
-import { getUser, removeUser } from "../utils/storage";
-
-const COLORS = {
-  background: "#F4F7FB",
-  surface: "#FFFFFF",
-  surfaceMuted: "#EEF4F8",
-  panel: "#133D5B",
-  panelAlt: "#1C5373",
-  accent: "#97C60B",
-  accentSoft: "#EEF7D0",
-  text: "#0E1830",
-  textMuted: "#72839A",
-  border: "#D9E3EC",
-  success: "#67A40F",
-  warning: "#D99B2B",
-  danger: "#B24B5E",
-  shadow: "rgba(10, 29, 49, 0.10)",
-};
-
-const currencyFormatter = new Intl.NumberFormat("en-LK", {
-  style: "currency",
-  currency: "LKR",
-  maximumFractionDigits: 0,
-});
-
-const compactNumberFormatter = new Intl.NumberFormat("en", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
-const formatCurrency = (value) => currencyFormatter.format(Number(value || 0));
-
-const formatCompactNumber = (value) =>
-  Number(value || 0) > 999 ? compactNumberFormatter.format(Number(value || 0)) : `${Number(value || 0)}`;
-
-const formatVehicleTitle = (vehicle) =>
-  [vehicle?.brand, vehicle?.model || vehicle?.type].filter(Boolean).join(" ");
+import { removeUser } from "../utils/storage";
+import { COLORS, SPACING } from "../ui/theme";
+import { StatusBadge } from "../ui/kit";
+import {
+  formatCurrency,
+  formatCompactNumber,
+  formatVehicleTitle,
+  formatTimeStamp,
+  formatRelativeDay,
+} from "../utils/formatters";
+import { getUser, withAuth } from "../utils/session";
 
 const formatAppointmentVehicle = (appointment) =>
   [appointment?.vehicle?.brand, appointment?.vehicle?.model || appointment?.vehicle?.type]
     .filter(Boolean)
     .join(" ");
-
-const formatTimeStamp = (value) => {
-  if (!value) return "No time";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No time";
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-};
 
 const buildAppointmentDate = (appointment) => {
   if (!appointment?.date) return null;
@@ -87,60 +46,6 @@ const buildAppointmentDate = (appointment) => {
   }
 
   return date;
-};
-
-const formatRelativeDay = (value) => {
-  if (!value) return "Not scheduled";
-
-  const target = new Date(value);
-  if (Number.isNaN(target.getTime())) return "Not scheduled";
-
-  const today = new Date();
-  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const startTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-  const diffDays = Math.round((startTarget - startToday) / 86400000);
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  if (diffDays === -1) return "Yesterday";
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-  }).format(target);
-};
-
-const getStatusTone = (status) => {
-  switch (String(status || "").toLowerCase()) {
-    case "available":
-    case "completed":
-    case "sent":
-    case "success":
-      return {
-        backgroundColor: COLORS.accentSoft,
-        color: COLORS.success,
-      };
-    case "reserved":
-    case "partial":
-    case "pending":
-    case "scheduled":
-      return {
-        backgroundColor: "#FFF1D6",
-        color: COLORS.warning,
-      };
-    case "cancelled":
-    case "failed":
-    case "sold":
-      return {
-        backgroundColor: "#FCE4E8",
-        color: COLORS.danger,
-      };
-    default:
-      return {
-        backgroundColor: COLORS.surfaceMuted,
-        color: COLORS.textMuted,
-      };
-  }
 };
 
 const getRoleLabel = (role) => {
@@ -159,17 +64,11 @@ const getRoleSubtitle = (role) => {
     case "admin":
       return "Monitor activity, inventory, sales, and dealership operations from one place.";
     case "staff":
-      return "Stay ahead of appointments, notifications, and sales follow-ups for the day.";
+      return "Stay ahead of appointments, leads, documents, and sales follow-ups for the day.";
     default:
       return "Track your test drives, browse inventory, and keep up with upcoming dealership events.";
   }
 };
-
-const withAuth = (token) => ({
-  headers: {
-    Authorization: `Bearer ${token}`,
-  },
-});
 
 function StatCard({ icon, label, value, caption, accent = false }) {
   return (
@@ -209,6 +108,21 @@ function SectionShell({ title, subtitle, action, children }) {
       </View>
       {children}
     </View>
+  );
+}
+
+function ModuleShortcut({ icon, title, subtitle, onPress }) {
+  return (
+    <Pressable style={styles.shortcutCard} onPress={onPress}>
+      <View style={styles.shortcutIcon}>
+        <MaterialCommunityIcons name={icon} size={20} color={COLORS.surface} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.shortcutTitle}>{title}</Text>
+        <Text style={styles.shortcutSubtitle}>{subtitle}</Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.textMuted} />
+    </Pressable>
   );
 }
 
@@ -261,7 +175,9 @@ export default function HomeScreen({ navigation }) {
           );
         }
 
-        requests.push({ key: "leads", promise: api.get("/api/leads") });
+        if (nextToken) {
+          requests.push({ key: "leads", promise: api.get("/api/leads", withAuth(nextToken)) });
+        }
 
         if (nextRole === "admin" && nextToken) {
           requests.push({
@@ -460,7 +376,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     if (role === "staff") {
-      return [...baseModules, "Appointments", "Notifications", "Sales Desk"];
+      return [...baseModules, "Appointments", "Leads", "Sales Desk"];
     }
 
     return [...baseModules, "My Test Drives"];
@@ -625,187 +541,11 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
 
-          <SectionShell
-            title="Inventory Spotlight"
-            subtitle="A live vehicle card powered by your inventory endpoint."
-            action={
-              <View style={styles.sectionChip}>
-                <Text style={styles.sectionChipText}>
-                  {formatCurrency(metrics.inventoryValue)}
-                </Text>
-              </View>
-            }>
-            {metrics.featuredVehicle ? (
-              <View style={styles.featuredCard}>
-                <View style={styles.featuredMedia}>
-                  {metrics.featuredVehicle.images?.[0]?.url ? (
-                    <Image
-                      source={{ uri: metrics.featuredVehicle.images[0].url }}
-                      style={styles.featuredImage}
-                    />
-                  ) : (
-                    <View style={styles.featuredPlaceholder}>
-                      <MaterialCommunityIcons
-                        name="car-hatchback"
-                        size={58}
-                        color={COLORS.panel}
-                      />
-                    </View>
-                  )}
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor: getStatusTone(metrics.featuredVehicle.status)
-                          .backgroundColor,
-                      },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        {
-                          color: getStatusTone(metrics.featuredVehicle.status).color,
-                        },
-                      ]}>
-                      {metrics.featuredVehicle.status || "available"}
-                    </Text>
-                  </View>
-                </View>
 
-                <View style={styles.featuredContent}>
-                  <Text style={styles.featuredTitle}>
-                    {formatVehicleTitle(metrics.featuredVehicle)}
-                  </Text>
-                  <Text style={styles.featuredSubtitle}>
-                    {metrics.featuredVehicle.type} • {metrics.featuredVehicle.year}
-                  </Text>
-                  <Text style={styles.featuredPrice}>
-                    {formatCurrency(metrics.featuredVehicle.price)}
-                  </Text>
 
-                  <View style={styles.featuredSpecsGrid}>
-                    <View style={styles.featuredSpec}>
-                      <Text style={styles.featuredSpecLabel}>Fuel</Text>
-                      <Text style={styles.featuredSpecValue}>
-                        {metrics.featuredVehicle.fuelType || "Not set"}
-                      </Text>
-                    </View>
-                    <View style={styles.featuredSpec}>
-                      <Text style={styles.featuredSpecLabel}>Drive</Text>
-                      <Text style={styles.featuredSpecValue}>
-                        {metrics.featuredVehicle.transmission || "Not set"}
-                      </Text>
-                    </View>
-                    <View style={styles.featuredSpec}>
-                      <Text style={styles.featuredSpecLabel}>Condition</Text>
-                      <Text style={styles.featuredSpecValue}>
-                        {metrics.featuredVehicle.condition || "Not set"}
-                      </Text>
-                    </View>
-                    <View style={styles.featuredSpec}>
-                      <Text style={styles.featuredSpecLabel}>Mileage</Text>
-                      <Text style={styles.featuredSpecValue}>
-                        {metrics.featuredVehicle.mileage
-                          ? `${metrics.featuredVehicle.mileage.toLocaleString()} km`
-                          : "No reading"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons
-                  name="car-off"
-                  size={32}
-                  color={COLORS.textMuted}
-                />
-                <Text style={styles.emptyStateTitle}>No vehicles yet</Text>
-                <Text style={styles.emptyStateText}>
-                  Add inventory in the backend and this spotlight will populate automatically.
-                </Text>
-              </View>
-            )}
-          </SectionShell>
 
-          <SectionShell
-            title={role === "user" ? "My Upcoming Test Drives" : "Upcoming Appointments"}
-            subtitle={
-              role === "user"
-                ? "Appointments from your customer booking flow."
-                : "Pulled from the scheduling endpoints used by staff and admin."
-            }
-            action={
-              <View style={styles.sectionActionWrap}>
-                <Text style={styles.sectionActionText}>
-                  {metrics.upcomingAppointments.length} queued
-                </Text>
-              </View>
-            }>
-            {metrics.upcomingAppointments.length ? (
-              metrics.upcomingAppointments.slice(0, 4).map((appointment) => (
-                <View key={appointment._id} style={styles.listRowCard}>
-                  <View style={styles.listRowIcon}>
-                    <MaterialCommunityIcons
-                      name="calendar-check"
-                      size={20}
-                      color={COLORS.panel}
-                    />
-                  </View>
 
-                  <View style={styles.listRowContent}>
-                    <View style={styles.listRowHead}>
-                      <Text style={styles.listRowTitle}>
-                        {formatAppointmentVehicle(appointment) || "Vehicle appointment"}
-                      </Text>
-                      <View
-                        style={[
-                          styles.statusPill,
-                          {
-                            backgroundColor: getStatusTone(appointment.status).backgroundColor,
-                          },
-                        ]}>
-                        <Text
-                          style={[
-                            styles.statusPillText,
-                            { color: getStatusTone(appointment.status).color },
-                          ]}>
-                          {appointment.status}
-                        </Text>
-                      </View>
-                    </View>
 
-                    <Text style={styles.listRowSubtitle}>
-                      {appointment.appointmentType?.replace("_", " ") || "viewing"} with{" "}
-                      {appointment.staffMember?.name || "assigned staff"}
-                    </Text>
-
-                    <View style={styles.listRowMeta}>
-                      <Text style={styles.listMetaText}>
-                        {formatRelativeDay(appointment.appointmentDate)}
-                      </Text>
-                      <Text style={styles.listMetaDivider}>•</Text>
-                      <Text style={styles.listMetaText}>
-                        {appointment.time || formatTimeStamp(appointment.appointmentDate)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons
-                  name="calendar-blank-outline"
-                  size={32}
-                  color={COLORS.textMuted}
-                />
-                <Text style={styles.emptyStateTitle}>Nothing scheduled yet</Text>
-                <Text style={styles.emptyStateText}>
-                  Upcoming bookings will appear here as soon as the backend has appointment data.
-                </Text>
-              </View>
-            )}
-          </SectionShell>
 
           {(role === "admin" || role === "staff") && (
             <SectionShell
@@ -886,21 +626,7 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.activityContent}>
                       <View style={styles.listRowHead}>
                         <Text style={styles.activityTitle}>{activity.title}</Text>
-                        <View
-                          style={[
-                            styles.statusPill,
-                            {
-                              backgroundColor: getStatusTone(activity.status).backgroundColor,
-                            },
-                          ]}>
-                          <Text
-                            style={[
-                              styles.statusPillText,
-                              { color: getStatusTone(activity.status).color },
-                            ]}>
-                            {activity.status}
-                          </Text>
-                        </View>
+                        <StatusBadge status={activity.status} />
                       </View>
 
                       <Text style={styles.activityDescription}>
@@ -934,37 +660,7 @@ export default function HomeScreen({ navigation }) {
             </SectionShell>
           )}
 
-          <SectionShell
-            title="Dealer Calendar"
-            subtitle="Public events and closures that can affect appointments.">
-            {metrics.nextEvent ? (
-              <View style={styles.eventCard}>
-                <View style={styles.eventMarker} />
-                <View style={styles.eventContent}>
-                  <Text style={styles.eventTitle}>{metrics.nextEvent.name}</Text>
-                  <Text style={styles.eventSubtitle}>
-                    {formatRelativeDay(metrics.nextEvent.startDate)} •{" "}
-                    {metrics.nextEvent.type || "Dealership event"}
-                  </Text>
-                  <Text style={styles.eventDescription}>
-                    {metrics.nextEvent.description || "Upcoming operational event on the calendar."}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons
-                  name="calendar-blank"
-                  size={32}
-                  color={COLORS.textMuted}
-                />
-                <Text style={styles.emptyStateTitle}>Calendar is clear</Text>
-                <Text style={styles.emptyStateText}>
-                  No upcoming closures or dealership events were returned by the backend.
-                </Text>
-              </View>
-            )}
-          </SectionShell>
+
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -1000,20 +696,20 @@ const styles = StyleSheet.create({
   },
   heroPanel: {
     backgroundColor: COLORS.panel,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 22,
+    paddingTop: 24,
     paddingBottom: 112,
     overflow: "hidden",
   },
   heroGlow: {
     position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
     backgroundColor: COLORS.panelAlt,
-    top: -70,
-    right: -80,
-    opacity: 0.9,
+    top: -100,
+    right: -100,
+    opacity: 0.8,
   },
   heroTopRow: {
     flexDirection: "row",
@@ -1075,53 +771,54 @@ const styles = StyleSheet.create({
     borderColor: "rgba(151,198,11,0.35)",
   },
   heroCopyBlock: {
-    marginTop: 26,
-    gap: 10,
+    marginTop: 32,
+    gap: 12,
   },
   heroEyebrow: {
     color: COLORS.accent,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "800",
     letterSpacing: 2.2,
     textTransform: "uppercase",
   },
   heroTitle: {
     color: COLORS.surface,
-    fontSize: 31,
-    lineHeight: 38,
+    fontSize: 34,
+    lineHeight: 42,
     fontWeight: "900",
   },
   heroText: {
     color: "#C7D6E3",
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 24,
     maxWidth: 320,
   },
   heroMetaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
-    marginTop: 26,
+    gap: 14,
+    marginTop: 30,
   },
   heroMetricCard: {
     flex: 1,
-    minHeight: 74,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    minHeight: 80,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
   heroMetricValue: {
     color: COLORS.surface,
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 26,
+    fontWeight: "900",
   },
   heroMetricLabel: {
     color: "#B5C7D6",
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 13,
+    marginTop: 6,
+    fontWeight: "600",
   },
   modulePillsRow: {
     paddingTop: 20,
@@ -1174,14 +871,14 @@ const styles = StyleSheet.create({
     width: "48.2%",
     backgroundColor: COLORS.surface,
     borderRadius: 26,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 20,
+    borderColor: "rgba(217, 227, 236, 0.6)",
+    shadowColor: COLORS.panel,
+    shadowOpacity: 0.04,
+    shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
-    elevation: 5,
+    elevation: 3,
   },
   statCardAccent: {
     backgroundColor: COLORS.panel,
@@ -1223,15 +920,48 @@ const styles = StyleSheet.create({
   },
   sectionShell: {
     backgroundColor: COLORS.surface,
-    borderRadius: 28,
-    padding: 18,
+    borderRadius: 30,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(217, 227, 236, 0.6)",
+    shadowColor: COLORS.panel,
+    shadowOpacity: 0.04,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 3,
+  },
+  shortcutsGrid: {
+    gap: 12,
+    marginTop: 6,
+  },
+  shortcutCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceMuted,
     borderWidth: 1,
     borderColor: COLORS.border,
-    shadowColor: COLORS.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
+  },
+  shortcutIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 16,
+    backgroundColor: COLORS.panel,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shortcutTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  shortcutSubtitle: {
+    marginTop: 4,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1245,9 +975,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: COLORS.text,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "900",
-    lineHeight: 28,
+    lineHeight: 30,
   },
   sectionSubtitle: {
     color: COLORS.textMuted,

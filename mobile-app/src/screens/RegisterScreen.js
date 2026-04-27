@@ -2,12 +2,16 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import api from "../services/api";
+import { Screen, Card, TextField, PrimaryButton } from "../ui/kit";
+import { COLORS, SPACING } from "../ui/theme";
 
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState("");
@@ -52,90 +56,114 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Register</Text>
+    <Screen>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.brandTitle}>Car Dealer</Text>
+            <Text style={styles.brandSubtitle}>Create your account</Text>
+          </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter full name"
-        value={name}
-        onChangeText={setName}
-        editable={!isSubmitting}
-      />
+          <Card style={styles.card}>
+            <TextField
+              label="Full Name"
+              placeholder="Enter full name"
+              value={name}
+              onChangeText={setName}
+              editable={!isSubmitting}
+            />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        editable={!isSubmitting}
-      />
+            <TextField
+              label="Email Address"
+              placeholder="Enter email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              editable={!isSubmitting}
+            />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!isSubmitting}
-      />
+            <TextField
+              label="Password"
+              placeholder="Enter password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              editable={!isSubmitting}
+            />
 
-      <TouchableOpacity
-        style={[styles.button, isSubmitting && styles.buttonDisabled]}
-        onPress={handleRegister}
-        disabled={isSubmitting}>
-        <Text style={styles.buttonText}>
-          {isSubmitting ? "Creating account..." : "Register"}
-        </Text>
-      </TouchableOpacity>
+            <PrimaryButton
+              label={isSubmitting ? "Creating account..." : "Register"}
+              onPress={handleRegister}
+              disabled={isSubmitting}
+              style={styles.submitButton}
+            />
+          </Card>
 
-      <TouchableOpacity
-        onPress={() => navigation.navigate("Login")}
-        disabled={isSubmitting}>
-        <Text style={styles.link}>Already have an account? Login</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Login")}
+              disabled={isSubmitting}>
+              <Text style={styles.link}>Login</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: SPACING.xl,
     justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#fff",
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 25,
-    textAlign: "center",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    marginBottom: 15,
-    borderRadius: 8,
-  },
-  button: {
-    backgroundColor: "#000",
-    padding: 14,
-    borderRadius: 8,
+  header: {
+    marginBottom: 40,
     alignItems: "center",
   },
-  buttonDisabled: {
-    opacity: 0.7,
+  brandTitle: {
+    fontSize: 42,
+    fontWeight: "900",
+    color: COLORS.panel,
+    letterSpacing: -1,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
+  brandSubtitle: {
+    fontSize: 16,
+    color: COLORS.textMuted,
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  card: {
+    padding: SPACING.xl,
+  },
+  submitButton: {
+    marginTop: SPACING.md,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 40,
+    gap: 8,
+  },
+  footerText: {
+    color: COLORS.textMuted,
+    fontSize: 15,
   },
   link: {
-    marginTop: 15,
-    textAlign: "center",
-    color: "blue",
+    color: COLORS.panel,
+    fontWeight: "900",
+    fontSize: 15,
+    textDecorationLine: "underline",
   },
 });
+

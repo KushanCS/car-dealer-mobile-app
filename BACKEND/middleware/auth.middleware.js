@@ -12,6 +12,7 @@ module.exports = function authMiddleware(req, res, next) {
 
     return next();
   } catch (e) {
+    console.error("Auth Middleware Error:", e.message);
     return res.status(401).json({ message: "Invalid token" });
   }
 };
