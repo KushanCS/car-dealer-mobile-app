@@ -50,7 +50,7 @@ const baseUrls = getBaseUrls();
 
 const api = axios.create({
   baseURL: baseUrls[0],
-  timeout: 10000,
+  timeout: 5000, // Reduced timeout for better mobile UX
 });
 
 api.interceptors.response.use(
@@ -58,7 +58,31 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (!originalRequest || error.response) {
+    // If we have a response, it's an HTTP error (4xx/5xx), don't retry
+    if (error.response) {
+      const status = error.response.status;
+      const message = error.response.data?.message || error.response.data?.error || error.message;
+
+      // Enhance error messages for common cases
+      if (status === 401) {
+        error.message = "Session expired. Please log in again.";
+      } else if (status === 403) {
+        error.message = "You don't have permission to perform this action.";
+      } else if (status === 404) {
+        error.message = "The requested resource was not found.";
+      } else if (status === 500) {
+        error.message = "Server error. Please try again later.";
+      } else if (status >= 400 && status < 500) {
+        error.message = message || "Request failed. Please check your input.";
+      } else if (status >= 500) {
+        error.message = "Server is temporarily unavailable. Please try again later.";
+      }
+
+      throw error;
+    }
+
+    // Network error - try to retry with different base URL
+    if (!originalRequest) {
       throw error;
     }
 
@@ -66,6 +90,7 @@ api.interceptors.response.use(
     const nextIndex = currentIndex + 1;
 
     if (nextIndex >= baseUrls.length) {
+      error.message = "Unable to connect to server. Please check your internet connection.";
       throw error;
     }
 

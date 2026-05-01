@@ -10,6 +10,7 @@ const {
   getAvailableStaff,
   getAvailableTimeSlots,
   getDateClosureInfo,
+  normalizeDateInput,
 } = require("../utils/appointmentValidation");
 
 function formatVehicleLabel(vehicle) {
@@ -20,10 +21,11 @@ function formatVehicleLabel(vehicle) {
 router.post("/book", auth, authorize("user"), async (req, res) => {
   try {
     const { vehicle, date, time, staffMember } = req.body;
-    if (!vehicle || !date || !time) return res.status(400).json({ message: "Vehicle, date, time required" });
+    const normalizedDate = normalizeDateInput(date);
+    if (!vehicle || !normalizedDate || !time) return res.status(400).json({ message: "Vehicle, date, time required" });
 
     // Validate appointment details
-    const errors = await validateAppointmentDetails(date, time, staffMember);
+    const errors = await validateAppointmentDetails(normalizedDate, time, staffMember);
     if (errors.length > 0) {
       return res.status(400).json({ message: errors[0], errors });
     }
@@ -31,11 +33,11 @@ router.post("/book", auth, authorize("user"), async (req, res) => {
     // If no staff member specified, auto-assign first available
     let assignedStaff = staffMember;
     if (!staffMember) {
-      const availableStaff = await getAvailableStaff(date, time);
+      const availableStaff = await getAvailableStaff(normalizedDate, time);
       if (availableStaff.length === 0) {
         return res.status(400).json({ 
           message: "No staff available at this time. Please select another time.",
-          timeSlots: await getAvailableTimeSlots(date)
+          timeSlots: await getAvailableTimeSlots(normalizedDate)
         });
       }
       assignedStaff = availableStaff[0]._id;
@@ -43,7 +45,7 @@ router.post("/book", auth, authorize("user"), async (req, res) => {
 
     const saved = await new Appointment({
       vehicle,
-      date: new Date(date),
+      date: new Date(normalizedDate),
       time,
       customer: req.user.id,
       staffMember: assignedStaff,
@@ -88,10 +90,11 @@ router.post("/book", auth, authorize("user"), async (req, res) => {
 router.get("/available-slots/:date", auth, authorize("user"), async (req, res) => {
   try {
     const { date } = req.params;
-    const closure = await getDateClosureInfo(date);
+    const normalizedDate = normalizeDateInput(date);
+    const closure = await getDateClosureInfo(normalizedDate);
     const slots = closure
       ? []
-      : await getAvailableTimeSlots(date, req.query.excludeAppointmentId || null);
+      : await getAvailableTimeSlots(normalizedDate, req.query.excludeAppointmentId || null);
     res.json({ slots, closure });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -114,7 +117,8 @@ router.put("/:id", auth, authorize("user"), async (req, res) => {
   if (!validateObjectId(id)) return res.status(400).json({ message: "Invalid appointment ID" });
 
   const { date, time } = req.body;
-  if (!date || !time) return res.status(400).json({ message: "Date and time required" });
+  const normalizedDate = normalizeDateInput(date);
+  if (!normalizedDate || !time) return res.status(400).json({ message: "Date and time required" });
 
   const appt = await Appointment.findOne({ _id: id, customer: req.user.id, isArchived: { $ne: true } });
   if (!appt) return res.status(404).json({ message: "Appointment not found" });
@@ -127,7 +131,7 @@ router.put("/:id", auth, authorize("user"), async (req, res) => {
     getAvailableStaff
   } = require("../utils/appointmentValidation");
 
-  const errors = await validateAppointmentDetails(date, time, appt.staffMember, appt._id);
+  const errors = await validateAppointmentDetails(normalizedDate, time, appt.staffMember, appt._id);
   if (errors.length > 0) {
     return res.status(400).json({ message: errors[0], errors });
   }
@@ -137,7 +141,7 @@ router.put("/:id", auth, authorize("user"), async (req, res) => {
     time: appt.time,
   };
 
-  appt.date = new Date(date);
+  appt.date = new Date(normalizedDate);
   appt.time = time;
   await appt.save();
 

@@ -6,7 +6,7 @@ const authorize = require("../middleware/authorize");
 const { validateObjectId } = require("../utils/validateObjectId");
 const { logActivity } = require("../utils/activityLogger");
 const { validateStrongPassword } = require("../utils/passwordValidation");
-const { normalizeEmail, normalizePersonName, validateEmailAddress, validatePersonName } = require("../utils/inputValidation");
+const { normalizeEmail, normalizePersonName, validateEmailAddressWithDomain, validateEmailAddress, validatePersonName } = require("../utils/inputValidation");
 
 router.post("/create", auth, authorize("admin"), async (req, res) => {
   try {
@@ -25,7 +25,7 @@ router.post("/create", auth, authorize("admin"), async (req, res) => {
     if (nameError) return res.status(400).json({ message: nameError });
 
     const normalizedEmail = normalizeEmail(email);
-    const emailError = validateEmailAddress(normalizedEmail);
+    const emailError = await validateEmailAddressWithDomain(normalizedEmail);
     if (emailError) return res.status(400).json({ message: emailError });
 
     const passwordError = validateStrongPassword(password);
@@ -37,7 +37,7 @@ router.post("/create", auth, authorize("admin"), async (req, res) => {
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) return res.status(400).json({ message: "Email already in use" });
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, 12);
 
     const user = await User.create({
       name: normalizedName,
@@ -97,7 +97,7 @@ router.put("/:id", auth, authorize("admin"), async (req, res) => {
     }
     if (typeof email === "string" && email.trim()) {
       const normalizedEmail = normalizeEmail(email);
-      const emailError = validateEmailAddress(normalizedEmail);
+      const emailError = await validateEmailAddressWithDomain(normalizedEmail);
       if (emailError) return res.status(400).json({ message: emailError });
       update.email = normalizedEmail;
     }

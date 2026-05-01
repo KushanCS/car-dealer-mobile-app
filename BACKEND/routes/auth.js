@@ -9,6 +9,11 @@ const { signAuthToken, serverSessionId } = require("../utils/authSession");
 const { validateStrongPassword } = require("../utils/passwordValidation");
 const { normalizeEmail, validateEmailAddress } = require("../utils/inputValidation");
 
+const BCRYPT_ROUNDS = 12;
+const OTP_EXPIRY_MINUTES = 10;
+const OTP_MIN = 100000;
+const OTP_MAX = 900000;
+
 const buildOtpHash = (email, otp) =>
   crypto.createHash("sha256").update(`${String(email).toLowerCase()}:${otp}`).digest("hex");
 
@@ -28,7 +33,7 @@ router.post("/register", async (req, res) => {
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) return res.status(400).json({ message: "Email already in use" });
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const user = await User.create({ name, email: normalizedEmail, password: hashed, role: "user" });
 
     await logActivity({
@@ -55,8 +60,6 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = normalizeEmail(email);
-    const emailError = validateEmailAddress(normalizedEmail);
-    if (emailError) return res.status(400).json({ message: emailError });
 
     const user = await User.findOne({ email: normalizedEmail, isDeleted: false });
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
@@ -81,15 +84,13 @@ router.post("/forgot-password", async (req, res) => {
     const emailError = validateEmailAddress(normalizedEmail);
     if (emailError) return res.status(400).json({ message: emailError });
 
-    console.log(`[AUTH] Forgot password requested for ${normalizedEmail}`);
     const user = await User.findOne({ email: normalizedEmail, isDeleted: false });
     if (!user) {
-      console.warn(`[AUTH] No active user found for ${normalizedEmail}. OTP email not sent.`);
       return res.status(404).json({ message: "Please enter a registered email address." });
     }
 
-    const resetOtp = String(Math.floor(100000 + Math.random() * 900000));
-    const resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    const resetOtp = String(Math.floor(OTP_MIN + Math.random() * OTP_MAX));
+    const resetOtpExpiry = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
     user.resetToken = null;
     user.resetTokenExpiry = null;
@@ -106,10 +107,6 @@ router.post("/forgot-password", async (req, res) => {
       console.error("Forgot password email delivery failed:", emailResult?.error);
       return res.status(502).json({ message: "Failed to send OTP email. Please try again later." });
     }
-
-    console.log(
-      `[AUTH] Password reset OTP email accepted for ${normalizedEmail}. Message ID: ${emailResult.messageId}`
-    );
 
     res.json({ message: "A temporary OTP has been sent to your email address." });
   } catch (err) {
@@ -147,7 +144,7 @@ router.post("/reset-password", async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
     user.password = hashed;
     user.resetToken = null;
     user.resetTokenExpiry = null;

@@ -9,14 +9,34 @@ const WORK_END_HOUR = 17; // 5 PM
 const WORK_END_MINUTE = 0;
 const APPOINTMENT_DURATION = 60; // minutes
 
-const buildAppointmentDateTime = (dateStr, timeStr = "00:00") => {
-  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))) return null;
-  if (!/^\d{2}:\d{2}$/.test(String(timeStr || ""))) return null;
-  return new Date(`${dateStr}T${timeStr}:00`);
+const normalizeDateInput = (value) => {
+  if (!value) return null;
+  let date;
+
+  if (value instanceof Date) {
+    date = value;
+  } else {
+    date = new Date(String(value).trim());
+  }
+
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
-const buildDayRange = (dateStr) => {
-  const appointmentDate = new Date(dateStr);
+const buildAppointmentDateTime = (dateInput, timeStr = "00:00") => {
+  const normalized = normalizeDateInput(dateInput);
+  if (!normalized || !/^\d{2}:\d{2}$/.test(String(timeStr || ""))) return null;
+  return new Date(`${normalized}T${timeStr}:00`);
+};
+
+const buildDayRange = (dateInput) => {
+  const normalized = normalizeDateInput(dateInput);
+  if (!normalized) return { dayStart: null, dayEnd: null };
+
+  const appointmentDate = new Date(`${normalized}T00:00:00`);
   const dayStart = new Date(appointmentDate);
   dayStart.setHours(0, 0, 0, 0);
 
@@ -53,6 +73,7 @@ const isWorkingHours = (timeStr) => {
 // Check if date is a holiday (Poya day or other holiday)
 const isHoliday = async (dateStr) => {
   const { dayStart, dayEnd } = buildDayRange(dateStr);
+  if (!dayStart || !dayEnd) return false;
 
   const holiday = await Holiday.findOne({
     date: { $gte: dayStart, $lte: dayEnd }
@@ -63,6 +84,7 @@ const isHoliday = async (dateStr) => {
 
 const getHolidayClosure = async (dateStr) => {
   const { dayStart, dayEnd } = buildDayRange(dateStr);
+  if (!dayStart || !dayEnd) return null;
   return Holiday.findOne({
     date: { $gte: dayStart, $lte: dayEnd }
   });
@@ -70,6 +92,7 @@ const getHolidayClosure = async (dateStr) => {
 
 const getShopClosureEvent = async (dateStr) => {
   const { dayStart, dayEnd } = buildDayRange(dateStr);
+  if (!dayStart || !dayEnd) return null;
   return Event.findOne({
     isShopClosed: true,
     startDate: { $lte: dayEnd },
@@ -78,7 +101,10 @@ const getShopClosureEvent = async (dateStr) => {
 };
 
 const getDateClosureInfo = async (dateStr) => {
-  const event = await getShopClosureEvent(dateStr);
+  const normalized = normalizeDateInput(dateStr);
+  if (!normalized) return null;
+
+  const event = await getShopClosureEvent(normalized);
   if (event) {
     const trimmedDescription = String(event.description || "").trim();
     const reason = trimmedDescription || event.name;
@@ -97,7 +123,7 @@ const getDateClosureInfo = async (dateStr) => {
     };
   }
 
-  const holiday = await getHolidayClosure(dateStr);
+  const holiday = await getHolidayClosure(normalized);
   if (holiday) {
     const trimmedDescription = String(holiday.description || "").trim();
     const reason = trimmedDescription || holiday.name;
@@ -119,17 +145,22 @@ const getDateClosureInfo = async (dateStr) => {
 
 // Get available staff members for a given date and time
 const getAvailableStaff = async (dateStr, timeStr, excludeAppointmentId = null) => {
+  const normalized = normalizeDateInput(dateStr);
   const allStaff = await User.find({
     role: "staff",
     isDeleted: false
   });
 
+  if (!normalized) {
+    return [];
+  }
+
   const filter = {
     status: { $ne: "cancelled" },
     isArchived: { $ne: true },
     date: {
-      $gte: new Date(dateStr + "T00:00:00"),
-      $lt: new Date(dateStr + "T23:59:59")
+      $gte: new Date(`${normalized}T00:00:00`),
+      $lt: new Date(`${normalized}T23:59:59`)
     },
     time: timeStr,
     staffMember: { $exists: true }
@@ -238,6 +269,7 @@ module.exports = {
   isHoliday,
   getDateClosureInfo,
   buildAppointmentDateTime,
+  normalizeDateInput,
   getAvailableStaff,
   isStaffAvailable,
   validateAppointmentDetails,

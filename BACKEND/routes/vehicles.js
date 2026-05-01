@@ -11,6 +11,12 @@ const upload = require("../middleware/vehicleUpload");
 const { validateObjectId } = require("../utils/validateObjectId");
 const authMiddleware = require("../middleware/auth.middleware");
 
+// Image processing constants
+const IMAGE_MAX_WIDTH = 1200;
+const IMAGE_MAX_HEIGHT = 900;
+const IMAGE_QUALITY = 85;
+const MAX_IMAGES_PER_VEHICLE = 4;
+
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 }
@@ -23,8 +29,8 @@ async function saveVehicleImage(buffer) {
   const filepath = path.join(uploadDir, filename);
 
   await sharp(buffer)
-    .resize(1200, 900, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 85 })
+    .resize(IMAGE_MAX_WIDTH, IMAGE_MAX_HEIGHT, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: IMAGE_QUALITY })
     .toFile(filepath);
 
   return { url: `/uploads/vehicles/${filename}`, filename };
@@ -252,7 +258,7 @@ router.put(
       const files = req.files || [];
       if (files.length) {
         const remaining = 4 - vehicle.images.length;
-        if (remaining <= 0) return res.status(400).json({ message: "Max 4 images already uploaded" });
+        if (remaining <= 0) return res.status(400).json({ message: `Max ${MAX_IMAGES_PER_VEHICLE} images already uploaded` });
 
         for (const f of files.slice(0, remaining)) {
           vehicle.images.push(await saveVehicleImage(f.buffer));
@@ -263,7 +269,7 @@ router.put(
       delete req.body.images;
 
       if (vehicle.images.length > 4) {
-        return res.status(400).json({ message: "Maximum 4 images allowed" });
+        return res.status(400).json({ message: `Maximum ${MAX_IMAGES_PER_VEHICLE} images allowed` });
       }
 
       await vehicle.save();

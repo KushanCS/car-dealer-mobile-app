@@ -21,7 +21,6 @@ import LeadFormScreen from "../screens/LeadFormScreen";
 import AppointmentsScreen from "../screens/AppointmentsScreen";
 import BookAppointmentScreen from "../screens/BookAppointmentScreen";
 import AppointmentFormScreen from "../screens/AppointmentFormScreen";
-import NotificationFormScreen from "../screens/NotificationFormScreen";
 import SalesScreen from "../screens/SalesScreen";
 import SaleFormScreen from "../screens/SaleFormScreen";
 import EventsScreen from "../screens/EventsScreen";
@@ -168,11 +167,17 @@ export default function AppNavigator() {
 
     const restoreSession = async () => {
       try {
-        await removeUser();
+        const savedSession = await getUser();
+        if (savedSession && (savedSession.token || savedSession.user)) {
+          if (isMounted) {
+            setInitialRouteName("Home");
+          }
+        }
+      } catch (error) {
+        console.log("Error restoring session:", error);
       } finally {
         if (isMounted) {
           setIsBootstrapping(false);
-          // initialRouteName remains "Login" as per state default
         }
       }
     };
@@ -214,8 +219,6 @@ export default function AppNavigator() {
 
         <Stack.Screen name="BookAppointment" component={BookAppointmentScreen} options={{ title: "Book" }} />
         <Stack.Screen name="AppointmentForm" component={AppointmentFormScreen} options={{ title: "Appointment" }} />
-
-        <Stack.Screen name="NotificationForm" component={NotificationFormScreen} options={{ title: "Notification" }} />
 
         <Stack.Screen name="SaleForm" component={SaleFormScreen} options={{ title: "Sale" }} />
 

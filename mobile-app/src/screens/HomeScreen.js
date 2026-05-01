@@ -27,7 +27,7 @@ import {
   formatTimeStamp,
   formatRelativeDay,
 } from "../utils/formatters";
-import { getUser, withAuth } from "../utils/session";
+import { getSession, withAuth } from "../utils/session";
 
 const formatAppointmentVehicle = (appointment) =>
   [appointment?.vehicle?.brand, appointment?.vehicle?.model || appointment?.vehicle?.type]
@@ -153,7 +153,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
-      const savedSession = await getUser();
+      const savedSession = await getSession();
       const nextProfile = savedSession?.user || savedSession;
       const nextRole = nextProfile?.role || "user";
       const nextToken = savedSession?.token || "";

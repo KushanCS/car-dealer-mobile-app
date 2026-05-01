@@ -231,7 +231,6 @@ const sendAppointmentReminder = async (recipientEmail, recipientName, appointmen
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${recipientEmail}:`, result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error("❌ Error sending email:", error);
@@ -255,7 +254,6 @@ const sendEmail = async (recipientEmail, subject, htmlContent) => {
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent to ${recipientEmail}:`, result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error("❌ Error sending email:", error);

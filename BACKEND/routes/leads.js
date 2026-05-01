@@ -3,7 +3,7 @@ const Lead = require("../models/Lead");
 const {
     normalizeEmail,
     normalizePhoneNumber,
-    validateEmailAddress,
+    validateEmailAddressWithDomain,
     validatePhoneNumber,
 } = require("../utils/inputValidation");
 
@@ -15,10 +15,10 @@ function normalizeLeadPayload(payload = {}) {
     };
 }
 
-function getLeadValidationErrors(payload = {}) {
+async function getLeadValidationErrors(payload = {}) {
     const errors = [];
     const phoneError = validatePhoneNumber(payload.contact_number, "Contact number");
-    const emailError = validateEmailAddress(payload.email);
+    const emailError = await validateEmailAddressWithDomain(payload.email);
 
     if (phoneError) errors.push(phoneError);
     if (emailError) errors.push(emailError);
@@ -29,7 +29,7 @@ function getLeadValidationErrors(payload = {}) {
 router.post("/add", async (req, res) => {
     try {
         const payload = normalizeLeadPayload(req.body);
-        const validationErrors = getLeadValidationErrors(payload);
+        const validationErrors = await getLeadValidationErrors(payload);
         if (validationErrors.length > 0) {
             return res.status(400).json({ errors: validationErrors });
         }
@@ -68,7 +68,7 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
     try {
         const payload = normalizeLeadPayload(req.body);
-        const validationErrors = getLeadValidationErrors(payload);
+        const validationErrors = await getLeadValidationErrors(payload);
         if (validationErrors.length > 0) {
             return res.status(400).json({ errors: validationErrors });
         }

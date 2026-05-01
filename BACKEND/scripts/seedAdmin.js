@@ -13,7 +13,7 @@ const createAdmin = async () => {
     process.exit();
   }
 
-  const hashedPassword = await bcrypt.hash("admin123", 10);
+  const hashedPassword = await bcrypt.hash("admin123", 12);
 
   const admin = new User({
     name: "System Admin",
