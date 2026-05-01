@@ -1,10 +1,10 @@
 # Car Dealer Management System
 
-A full-stack mobile application for managing car dealership operations, including inventory, leads, appointments, and sales tracking.
+A full-stack mobile application for managing car dealership operations, including inventory, leads, appointments, sales tracking, and role-based access.
 
-## 📱 Project Structure
-- `BACKEND/`: Express.js server with MongoDB (Mongoose), handling authentication, file uploads, and business logic.
-- `mobile-app/`: React Native (Expo) application featuring a custom UI kit and role-based access control.
+## 📁 Project Structure
+- `BACKEND/`: Express.js API with MongoDB (Mongoose). Handles authentication, user roles, file uploads, appointments, vehicles, leads, sales, and notifications.
+- `mobile-app/`: React Native (Expo) mobile client with shared UI kit, session management, and role-specific navigation.
 
 ---
 
@@ -12,13 +12,13 @@ A full-stack mobile application for managing car dealership operations, includin
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18 or higher)
-- [MongoDB](https://www.mongodb.com/try/download/community) (Local or Atlas)
-- [Expo Go](https://expo.dev/expo-go) app on your mobile device
+- [MongoDB](https://www.mongodb.com/try/download/community) or MongoDB Atlas
+- [Expo Go](https://expo.dev/expo-go) for mobile testing
 
 ---
 
 ### 1. Backend Setup
-1. Navigate to the backend directory:
+1. Change to the backend folder:
    ```bash
    cd BACKEND
    ```
@@ -26,26 +26,31 @@ A full-stack mobile application for managing car dealership operations, includin
    ```bash
    npm install
    ```
-3. Create a `.env` file in the `BACKEND` root:
+3. Create a `.env` file in `BACKEND/` with the required values:
    ```env
-   PORT=5000
+   PORT=8070
    MONGODB_URI=mongodb://localhost:27017/car-dealer
    JWT_SECRET=your_jwt_secret_key
+   EMAIL_HOST=smtp.example.com
+   EMAIL_PORT=587
+   EMAIL_USER=your-email@example.com
+   EMAIL_PASS=your-email-password
    ```
-4. Seed initial data (Optional):
+4. Seed initial admin user (optional but recommended):
    ```bash
-   npm run seed:admin      # Creates default admin
-   npm run seed:holidays   # Populates holiday calendar
+   npm run seed:admin
    ```
-5. Start the server:
+5. Start the backend server:
    ```bash
    npm run dev
    ```
 
+The backend defaults to port `8070`, unless overridden in `.env`.
+
 ---
 
 ### 2. Mobile App Setup
-1. Navigate to the mobile app directory:
+1. Change to the mobile app folder:
    ```bash
    cd mobile-app
    ```
@@ -53,26 +58,46 @@ A full-stack mobile application for managing car dealership operations, includin
    ```bash
    npm install
    ```
-3. **Configure API URL**:
-   Open `src/services/api.js` and update the `baseURL` to your computer's local IP address (e.g., `http://192.168.1.10:5000`).
-4. Start the Expo server:
+3. Start Expo:
    ```bash
    npx expo start
    ```
-5. Scan the QR code with your **Expo Go** app.
+4. Open the app using Expo Go on your device or an emulator.
+
+> Note: `src/services/api.js` already includes local host and emulator fallbacks. If using a physical device on the same network, you may need to replace the API base URL with your machine IP.
 
 ---
 
-## 🛠 Features
-- **Role-Based Access**: Specialized views for Admin, Staff, and Customers.
-- **Inventory Management**: Full CRUD for vehicles with image upload support.
-- **Leads & Sales**: Track customer enquiries and convert them into successful sales.
-- **Appointment Booking**: Integrated calendar with holiday and slot validation.
-- **Custom UI Kit**: Standardized design system for a professional look and feel.
-
-## 🧹 Maintenance Commands
-- **Backend Clean**: Pointed to `server.js` as the main entry point.
-- **Mobile Kit**: Centralized components in `src/ui/kit.js` and theme in `src/ui/theme.js`.
+## 🔐 Default Admin Credentials
+Use these after seeding the admin user or creating an admin account:
+- Email: `admin@autopulse.com`
+- Password: `admin123`
 
 ---
+
+## 🧠 Key Features
+- Role-based access controls for Admin, Staff, and Customer users
+- Vehicle inventory management with image uploads
+- Lead capture and sales tracking
+- Appointment booking with holiday and availability validation
+- Password reset via OTP email
+- Mobile-friendly Expo React Native client
+
+---
+
+## 🛠 What Changed in This Update
+- Fixed backend startup order and MongoDB connection handling
+- Restored mobile session persistence on app launch
+- Standardized auth email validation across login and password flows
+- Improved mobile API error handling and timeout behavior
+- Updated Expo package compatibility for stable dependencies
+
+---
+
+## 📌 Notes
+- Keep `BACKEND/.env` secure and do not commit secrets.
+- Use the `mobile-app` folder for all mobile client work and `BACKEND` for backend changes.
+
+---
+
 *Developed by Group 14*
